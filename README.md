@@ -13,19 +13,23 @@ A Dockerized LangGraph agent that searches Airbnb listings, pauses for human con
 
 ```mermaid
 flowchart TD
-    A([POST /chat]) --> B[llm node]
+    subgraph T1["① First Turn  —  POST /chat"]
+        A([Client]) --> llm[llm node]
+        llm -->|tool calls| tools[tools node]
+        llm -->|no tool calls| END1([END])
+        tools -->|airbnb_search| llm
+        tools -->|airbnb_listing_details| ext[extractor node\npure-Python JSON parse]
+        ext --> conf[confirm node]
+        conf -->|interrupt fires\nstate frozen in MemorySaver| pause([⏸ graph paused\nreturns question + thread_id])
+    end
 
-    B -->|no tool calls| Z([END])
-    B -->|tool calls| C[tools node]
+    subgraph T2["② Resume Turn  —  POST /chat  confirmed=true + thread_id"]
+        resume([Client resumes\nwith thread_id]) -->|Command resume=True| conf2[confirm node\npicks up after interrupt]
+        conf2 --> pipe[pipeline\nCSV → XLSX → Gmail SMTP]
+        pipe --> END2([END])
+    end
 
-    C -->|last tool: airbnb_search| B
-    C -->|last tool: airbnb_listing_details| D[extractor node\npure-Python JSON parse]
-
-    D --> E[confirm node\nLangGraph interrupt]
-    E --> Z
-
-    F([Resume turn\nconfirmed=true]) -->|Command resume=True| G[pipeline\nCSV → XLSX → Gmail]
-    G --> Z
+    pause -. "client stores thread_id\nuser clicks confirm" .-> resume
 ```
 
 ### Nodes
