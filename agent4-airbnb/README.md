@@ -11,28 +11,21 @@ A Dockerized LangGraph agent that searches Airbnb listings, pauses for human con
 
 ## Architecture
 
-```
-POST /chat
-     │
-     ▼
-  llm node  ──────────────────────────────────────────────────────────┐
-     │                                                                │
-     │ (tool calls)                                                   │
-     ▼                                                                │
- tools node                                                           │
-     │                                                                │
-     ├─ last tool = airbnb_search       ──► llm node  (fetch details) ┘
-     │
-     └─ last tool = airbnb_listing_details ──► extractor node
-                                                     │
-                                                     ▼
-                                               confirm node  ◄── LangGraph interrupt()
-                                                     │
-                                                     ▼
-                                                   END
+```mermaid
+flowchart TD
+    A([POST /chat]) --> B[llm node]
 
-Resume turn (confirmed=true):
-  Command(resume=True) → pipeline → CSV → XLSX → Gmail
+    B -->|no tool calls| Z([END])
+    B -->|tool calls| C[tools node]
+
+    C -->|last tool: airbnb_search| B
+    C -->|last tool: airbnb_listing_details| D[extractor node\npure-Python JSON parse]
+
+    D --> E[confirm node\nLangGraph interrupt]
+    E --> Z
+
+    F([Resume turn\nconfirmed=true]) -->|Command resume=True| G[pipeline\nCSV → XLSX → Gmail]
+    G --> Z
 ```
 
 ### Nodes
